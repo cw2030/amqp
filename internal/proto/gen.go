@@ -151,7 +151,7 @@ var (
   /* Rebuild from the spec/gen.go tool */
 
   {{with .Root}}
-  package amqp
+  package proto
 
   import (
     "fmt"
@@ -190,30 +190,30 @@ var (
 				Body []byte{{end}}
       }
 
-			func (msg *{{$struct}}) id() (uint16, uint16) {
+			func (msg *{{$struct}}) ID() (uint16, uint16) {
 				return {{$class.Index}}, {{$method.Index}}
 			}
 
-			func (msg *{{$struct}}) wait() (bool) {
+			func (msg *{{$struct}}) Wait() (bool) {
 				return {{.Synchronous}}{{if $.HasField "NoWait" .}} && !msg.NoWait{{end}}
 			}
 
 			{{if .Content}}
-      func (msg *{{$struct}}) getContent() (properties, []byte) {
+      func (msg *{{$struct}}) GetContent() (properties, []byte) {
         return msg.Properties, msg.Body
       }
 
-      func (msg *{{$struct}}) setContent(props properties, body []byte) {
+      func (msg *{{$struct}}) SetContent(props properties, body []byte) {
         msg.Properties, msg.Body = props, body
       }
 			{{end}}
-      func (msg *{{$struct}}) write(w io.Writer) (err error) {
+      func (msg *{{$struct}}) Write(w io.Writer) (err error) {
 				{{if $.HasType "bit" $method}}var bits byte{{end}}
         {{.Fields | $.Fieldsets | $.Partial "enc-"}}
         return
       }
 
-      func (msg *{{$struct}}) read(r io.Reader) (err error) {
+      func (msg *{{$struct}}) Read(r io.Reader) (err error) {
 				{{if $.HasType "bit" $method}}var bits byte{{end}}
         {{.Fields | $.Fieldsets | $.Partial "dec-"}}
         return
@@ -221,8 +221,8 @@ var (
     {{end}}
   {{end}}
 
-  func (r *reader) parseMethodFrame(channel uint16, size uint32) (f frame, err error) {
-    mf := &methodFrame {
+  func (r *Reader) ParseMethodFrame(channel uint16, size uint32) (f frame, err error) {
+    mf := &MethodFrame {
       ChannelId: channel,
     }
 
@@ -484,7 +484,7 @@ func (renderer *renderer) Tag(d Domain) string {
 }
 
 func (renderer *renderer) StructName(parts ...string) string {
-	return parts[0] + public(parts[1:]...)
+	return public(parts[0:]...)
 }
 
 func clean(body string) (res string) {
