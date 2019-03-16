@@ -74,7 +74,7 @@ func newError(code uint16, text string) *Error {
 	return &Error{
 		Code:    int(code),
 		Reason:  text,
-		Recover: isSoftExceptionCode(int(code)),
+		Recover: IsSoftExceptionCode(int(code)),
 		Server:  true,
 	}
 }
@@ -84,7 +84,7 @@ func (e Error) Error() string {
 }
 
 // Used by header frames to capture routing and header information
-type properties struct {
+type Properties struct {
 	ContentType     string    // MIME content type
 	ContentEncoding string    // MIME content encoding
 	Headers         Table     // Application or header exchange table
@@ -276,8 +276,8 @@ type message interface {
 
 type messageWithContent interface {
 	message
-	GetContent() (properties, []byte)
-	SetContent(properties, []byte)
+	GetContent() (Properties, []byte)
+	SetContent(Properties, []byte)
 }
 
 /*
@@ -321,12 +321,12 @@ type Writer struct {
 // Implements the frame interface for Connection RPC
 type ProtocolHeader struct{}
 
-func (ProtocolHeader) write(w io.Writer) error {
+func (ProtocolHeader) Write(w io.Writer) error {
 	_, err := w.Write([]byte{'A', 'M', 'Q', 'P', 0, 0, 9, 1})
 	return err
 }
 
-func (ProtocolHeader) channel() uint16 {
+func (ProtocolHeader) Channel() uint16 {
 	panic("only valid as initial handshake")
 }
 
@@ -400,7 +400,7 @@ type HeaderFrame struct {
 	ClassId    uint16
 	weight     uint16
 	Size       uint64
-	Properties properties
+	Properties Properties
 }
 
 func (f *HeaderFrame) Channel() uint16 { return f.ChannelId }

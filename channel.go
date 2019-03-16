@@ -72,7 +72,7 @@ type Channel struct {
 
 	// Current state for frame re-assembly, only mutated from recv
 	message messageWithContent
-	header  *headerFrame
+	header  *proto.HeaderFrame
 	body    []byte
 }
 
@@ -209,7 +209,7 @@ func (ch *Channel) sendClosed(msg message) (err error) {
 	// After a 'channel.close' is sent or received the only valid response is
 	// channel.close-ok
 	if _, ok := msg.(*proto.ChannelCloseOk); ok {
-		return ch.connection.send(&methodFrame{
+		return ch.connection.send(&proto.MethodFrame{
 			ChannelId: ch.id,
 			Method:    msg,
 		})
@@ -232,14 +232,14 @@ func (ch *Channel) sendOpen(msg message) (err error) {
 			size = len(body)
 		}
 
-		if err = ch.connection.send(&methodFrame{
+		if err = ch.connection.send(&proto.MethodFrame{
 			ChannelId: ch.id,
 			Method:    content,
 		}); err != nil {
 			return
 		}
 
-		if err = ch.connection.send(&headerFrame{
+		if err = ch.connection.send(&proto.HeaderFrame{
 			ChannelId:  ch.id,
 			ClassId:    class,
 			Size:       uint64(len(body)),
@@ -254,7 +254,7 @@ func (ch *Channel) sendOpen(msg message) (err error) {
 				j = len(body)
 			}
 
-			if err = ch.connection.send(&bodyFrame{
+			if err = ch.connection.send(&proto.BodyFrame{
 				ChannelId: ch.id,
 				Body:      body[i:j],
 			}); err != nil {
@@ -262,7 +262,7 @@ func (ch *Channel) sendOpen(msg message) (err error) {
 			}
 		}
 	} else {
-		err = ch.connection.send(&methodFrame{
+		err = ch.connection.send(&proto.MethodFrame{
 			ChannelId: ch.id,
 			Method:    msg,
 		})
@@ -343,7 +343,7 @@ func (ch *Channel) transition(f func(*Channel, frame) error) error {
 
 func (ch *Channel) recvMethod(f frame) error {
 	switch frame := f.(type) {
-	case *methodFrame:
+	case *proto.MethodFrame:
 		if msg, ok := frame.Method.(messageWithContent); ok {
 			ch.body = make([]byte, 0)
 			ch.message = msg
@@ -353,11 +353,11 @@ func (ch *Channel) recvMethod(f frame) error {
 		ch.dispatch(frame.Method) // termination state
 		return ch.transition((*Channel).recvMethod)
 
-	case *headerFrame:
+	case *proto.HeaderFrame:
 		// drop
 		return ch.transition((*Channel).recvMethod)
 
-	case *bodyFrame:
+	case *proto.BodyFrame:
 		// drop
 		return ch.transition((*Channel).recvMethod)
 	}
@@ -367,11 +367,11 @@ func (ch *Channel) recvMethod(f frame) error {
 
 func (ch *Channel) recvHeader(f frame) error {
 	switch frame := f.(type) {
-	case *methodFrame:
+	case *proto.MethodFrame:
 		// interrupt content and handle method
 		return ch.recvMethod(f)
 
-	case *headerFrame:
+	case *proto.HeaderFrame:
 		// start collecting if we expect body frames
 		ch.header = frame
 
@@ -382,7 +382,7 @@ func (ch *Channel) recvHeader(f frame) error {
 		}
 		return ch.transition((*Channel).recvContent)
 
-	case *bodyFrame:
+	case *proto.BodyFrame:
 		// drop and reset
 		return ch.transition((*Channel).recvMethod)
 	}
@@ -394,15 +394,15 @@ func (ch *Channel) recvHeader(f frame) error {
 // defined by the header has been reached
 func (ch *Channel) recvContent(f frame) error {
 	switch frame := f.(type) {
-	case *methodFrame:
+	case *proto.MethodFrame:
 		// interrupt content and handle method
 		return ch.recvMethod(f)
 
-	case *headerFrame:
+	case *proto.HeaderFrame:
 		// drop and reset
 		return ch.transition((*Channel).recvMethod)
 
-	case *bodyFrame:
+	case *proto.BodyFrame:
 		ch.body = append(ch.body, frame.Body...)
 
 		if uint64(len(ch.body)) >= ch.header.Size {
@@ -427,7 +427,7 @@ It is safe to call this method multiple times.
 func (ch *Channel) Close() error {
 	defer ch.connection.closeChannel(ch, nil)
 	return ch.call(
-		&proto.ChannelClose{ReplyCode: replySuccess},
+		&proto.ChannelClose{ReplyCode: proto.ReplySuccess},
 		&proto.ChannelCloseOk{},
 	)
 }
@@ -1336,7 +1336,7 @@ func (ch *Channel) Publish(exchange, key string, mandatory, immediate bool, msg 
 		Mandatory:  mandatory,
 		Immediate:  immediate,
 		Body:       msg.Body,
-		Properties: properties{
+		Properties: proto.Properties{
 			Headers:         msg.Headers,
 			ContentType:     msg.ContentType,
 			ContentEncoding: msg.ContentEncoding,

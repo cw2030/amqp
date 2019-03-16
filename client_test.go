@@ -17,8 +17,8 @@ import (
 
 type server struct {
 	*testing.T
-	r reader             // framer <- client
-	w writer             // framer -> client
+	r *proto.Reader      // framer <- client
+	w *proto.Writer      // framer -> client
 	S io.ReadWriteCloser // Server IO
 	C io.ReadWriteCloser // Client IO
 
@@ -44,8 +44,8 @@ func newSession(t *testing.T) (io.ReadWriteCloser, *server) {
 
 	server := server{
 		T: t,
-		r: reader{rws},
-		w: writer{rws},
+		r: proto.NewReader(rws),
+		w: proto.NewWriter(rws),
 		S: rws,
 		C: rwc,
 	}
@@ -65,27 +65,27 @@ func (t *server) expectBytes(b []byte) {
 }
 
 func (t *server) send(channel int, m message) {
-	defer time.AfterFunc(time.Second, func() { panic("send deadlock") }).Stop()
+	defer time.AfterFunc(time.Second, func() { t.Fatal("send deadlock") }).Stop()
 
 	if msg, ok := m.(messageWithContent); ok {
 		props, body := msg.GetContent()
 		class, _ := msg.ID()
-		t.w.WriteFrame(&methodFrame{
+		t.w.WriteFrame(&proto.MethodFrame{
 			ChannelId: uint16(channel),
 			Method:    msg,
 		})
-		t.w.WriteFrame(&headerFrame{
+		t.w.WriteFrame(&proto.HeaderFrame{
 			ChannelId:  uint16(channel),
 			ClassId:    class,
 			Size:       uint64(len(body)),
 			Properties: props,
 		})
-		t.w.WriteFrame(&bodyFrame{
+		t.w.WriteFrame(&proto.BodyFrame{
 			ChannelId: uint16(channel),
 			Body:      body,
 		})
 	} else {
-		t.w.WriteFrame(&methodFrame{
+		t.w.WriteFrame(&proto.MethodFrame{
 			ChannelId: uint16(channel),
 			Method:    m,
 		})
@@ -94,10 +94,10 @@ func (t *server) send(channel int, m message) {
 
 // drops all but method frames expected on the given channel
 func (t *server) recv(channel int, m message) message {
-	defer time.AfterFunc(time.Second, func() { panic("recv deadlock") }).Stop()
+	defer time.AfterFunc(time.Second, func() { t.Fatal("recv deadlock") }).Stop()
 
 	var remaining int
-	var header *headerFrame
+	var header *proto.HeaderFrame
 	var body []byte
 
 	for {
@@ -111,10 +111,10 @@ func (t *server) recv(channel int, m message) message {
 		}
 
 		switch f := frame.(type) {
-		case *heartbeatFrame:
+		case *proto.HeartbeatFrame:
 			// drop
 
-		case *headerFrame:
+		case *proto.HeaderFrame:
 			// start content state
 			header = f
 			remaining = int(header.Size)
@@ -123,7 +123,7 @@ func (t *server) recv(channel int, m message) message {
 				return m
 			}
 
-		case *bodyFrame:
+		case *proto.BodyFrame:
 			// continue until terminated
 			body = append(body, f.Body...)
 			remaining -= len(f.Body)
@@ -132,7 +132,7 @@ func (t *server) recv(channel int, m message) message {
 				return m
 			}
 
-		case *methodFrame:
+		case *proto.MethodFrame:
 			if reflect.TypeOf(m) == reflect.TypeOf(f.Method) {
 				wantv := reflect.ValueOf(m).Elem()
 				havev := reflect.ValueOf(f.Method).Elem()

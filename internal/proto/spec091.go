@@ -19,13 +19,13 @@ import (
 // ErrCredentials.  The text of the error is likely more interesting than
 // these constants.
 const (
-	frameMethod        = 1
-	frameHeader        = 2
-	frameBody          = 3
-	frameHeartbeat     = 8
-	frameMinSize       = 4096
-	frameEnd           = 206
-	replySuccess       = 200
+	FrameMethod        = 1
+	FrameHeader        = 2
+	FrameBody          = 3
+	FrameHeartbeat     = 8
+	FrameMinSize       = 4096
+	FrameEnd           = 206
+	ReplySuccess       = 200
 	ContentTooLarge    = 311
 	NoRoute            = 312
 	NoConsumers        = 313
@@ -46,7 +46,7 @@ const (
 	InternalError      = 541
 )
 
-func isSoftExceptionCode(code int) bool {
+func IsSoftExceptionCode(code int) bool {
 	switch code {
 	case 311:
 		return true
@@ -1933,7 +1933,7 @@ type BasicPublish struct {
 	RoutingKey string
 	Mandatory  bool
 	Immediate  bool
-	Properties properties
+	Properties Properties
 	Body       []byte
 }
 
@@ -1945,11 +1945,11 @@ func (msg *BasicPublish) Wait() bool {
 	return false
 }
 
-func (msg *BasicPublish) GetContent() (properties, []byte) {
+func (msg *BasicPublish) GetContent() (Properties, []byte) {
 	return msg.Properties, msg.Body
 }
 
-func (msg *BasicPublish) SetContent(props properties, body []byte) {
+func (msg *BasicPublish) SetContent(props Properties, body []byte) {
 	msg.Properties, msg.Body = props, body
 }
 
@@ -2010,7 +2010,7 @@ type BasicReturn struct {
 	ReplyText  string
 	Exchange   string
 	RoutingKey string
-	Properties properties
+	Properties Properties
 	Body       []byte
 }
 
@@ -2022,11 +2022,11 @@ func (msg *BasicReturn) Wait() bool {
 	return false
 }
 
-func (msg *BasicReturn) GetContent() (properties, []byte) {
+func (msg *BasicReturn) GetContent() (Properties, []byte) {
 	return msg.Properties, msg.Body
 }
 
-func (msg *BasicReturn) SetContent(props properties, body []byte) {
+func (msg *BasicReturn) SetContent(props Properties, body []byte) {
 	msg.Properties, msg.Body = props, body
 }
 
@@ -2074,7 +2074,7 @@ type BasicDeliver struct {
 	Redelivered bool
 	Exchange    string
 	RoutingKey  string
-	Properties  properties
+	Properties  Properties
 	Body        []byte
 }
 
@@ -2086,11 +2086,11 @@ func (msg *BasicDeliver) Wait() bool {
 	return false
 }
 
-func (msg *BasicDeliver) GetContent() (properties, []byte) {
+func (msg *BasicDeliver) GetContent() (Properties, []byte) {
 	return msg.Properties, msg.Body
 }
 
-func (msg *BasicDeliver) SetContent(props properties, body []byte) {
+func (msg *BasicDeliver) SetContent(props Properties, body []byte) {
 	msg.Properties, msg.Body = props, body
 }
 
@@ -2210,7 +2210,7 @@ type BasicGetOk struct {
 	Exchange     string
 	RoutingKey   string
 	MessageCount uint32
-	Properties   properties
+	Properties   Properties
 	Body         []byte
 }
 
@@ -2222,11 +2222,11 @@ func (msg *BasicGetOk) Wait() bool {
 	return true
 }
 
-func (msg *BasicGetOk) GetContent() (properties, []byte) {
+func (msg *BasicGetOk) GetContent() (Properties, []byte) {
 	return msg.Properties, msg.Body
 }
 
-func (msg *BasicGetOk) SetContent(props properties, body []byte) {
+func (msg *BasicGetOk) SetContent(props Properties, body []byte) {
 	msg.Properties, msg.Body = props, body
 }
 

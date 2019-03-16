@@ -165,10 +165,10 @@ var (
 	// these constants.
 	const (
 	{{range $c := .Constants}}
-	{{if $c.IsError}}{{.Name | public}}{{else}}{{.Name | private}}{{end}} = {{.Value}}{{end}}
+	{{.Name | public}} = {{.Value}}{{end}}
   )
 
-	func isSoftExceptionCode(code int) bool {
+	func IsSoftExceptionCode(code int) bool {
 		switch code {
 		{{range $c := .Constants}} {{if $c.IsSoftError}} case {{$c.Value}}:
 			return true
@@ -186,7 +186,7 @@ var (
       type {{$struct}} struct {
         {{range .Fields}}
         {{$.FieldName .}} {{$.FieldType . | $.NativeType}} {{if .Label}}// {{.Label}}{{end}}{{end}}
-				{{if .Content}}Properties properties
+				{{if .Content}}Properties Properties
 				Body []byte{{end}}
       }
 
@@ -199,11 +199,11 @@ var (
 			}
 
 			{{if .Content}}
-      func (msg *{{$struct}}) GetContent() (properties, []byte) {
+      func (msg *{{$struct}}) GetContent() (Properties, []byte) {
         return msg.Properties, msg.Body
       }
 
-      func (msg *{{$struct}}) SetContent(props properties, body []byte) {
+      func (msg *{{$struct}}) SetContent(props Properties, body []byte) {
         msg.Properties, msg.Body = props, body
       }
 			{{end}}

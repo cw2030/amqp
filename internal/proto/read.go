@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+func NewReader(r io.Reader) *Reader {
+	return &Reader{r: r}
+}
+
 /*
 Reads a frame from an input stream and returns an interface that can be cast into
 one of the following:
@@ -55,22 +59,22 @@ func (r *Reader) ReadFrame() (frame frame, err error) {
 	size := binary.BigEndian.Uint32(scratch[3:7])
 
 	switch typ {
-	case frameMethod:
+	case FrameMethod:
 		if frame, err = r.parseMethodFrame(channel, size); err != nil {
 			return
 		}
 
-	case frameHeader:
+	case FrameHeader:
 		if frame, err = r.parseHeaderFrame(channel, size); err != nil {
 			return
 		}
 
-	case frameBody:
+	case FrameBody:
 		if frame, err = r.parseBodyFrame(channel, size); err != nil {
 			return nil, err
 		}
 
-	case frameHeartbeat:
+	case FrameHeartbeat:
 		if frame, err = r.parseHeartbeatFrame(channel, size); err != nil {
 			return
 		}
@@ -83,7 +87,7 @@ func (r *Reader) ReadFrame() (frame frame, err error) {
 		return nil, err
 	}
 
-	if scratch[0] != frameEnd {
+	if scratch[0] != FrameEnd {
 		return nil, ErrFrame
 	}
 

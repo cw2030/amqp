@@ -86,7 +86,7 @@ type Connection struct {
 	conn io.ReadWriteCloser
 
 	rpc       chan message
-	writer    *writer
+	writer    *proto.Writer
 	sends     chan time.Time     // timestamps of each frame sent
 	deadlines chan readDeadliner // heartbeater updates read deadlines
 
@@ -225,7 +225,7 @@ to use your own custom transport.
 func Open(conn io.ReadWriteCloser, config Config) (*Connection, error) {
 	c := &Connection{
 		conn:      conn,
-		writer:    &writer{bufio.NewWriter(conn)},
+		writer:    proto.NewWriter(bufio.NewWriter(conn)),
 		channels:  make(map[uint16]*Channel),
 		rpc:       make(chan message),
 		sends:     make(chan time.Time),
@@ -329,7 +329,7 @@ func (c *Connection) Close() error {
 	defer c.shutdown(nil)
 	return c.call(
 		&proto.ConnectionClose{
-			ReplyCode: replySuccess,
+			ReplyCode: proto.ReplySuccess,
 			ReplyText: "kthxbai",
 		},
 		&proto.ConnectionCloseOk{},
@@ -369,7 +369,7 @@ func (c *Connection) send(f frame) error {
 	if err != nil {
 		// shutdown could be re-entrant from signaling notify chans
 		go c.shutdown(&Error{
-			Code:   FrameError,
+			Code:   proto.FrameError,
 			Reason: err.Error(),
 		})
 	} else {
@@ -441,11 +441,11 @@ func (c *Connection) demux(f frame) {
 
 func (c *Connection) dispatch0(f frame) {
 	switch mf := f.(type) {
-	case *methodFrame:
+	case *proto.MethodFrame:
 		switch m := mf.Method.(type) {
 		case *proto.ConnectionClose:
 			// Send immediately as shutdown will close our side of the writer.
-			c.send(&methodFrame{
+			c.send(&proto.MethodFrame{
 				ChannelId: 0,
 				Method:    &proto.ConnectionCloseOk{},
 			})
@@ -462,7 +462,7 @@ func (c *Connection) dispatch0(f frame) {
 		default:
 			c.rpc <- m
 		}
-	case *heartbeatFrame:
+	case *proto.HeartbeatFrame:
 		// kthx - all reads reset our deadline.  so we can drop this
 	default:
 		// lolwat - channel0 only responds to methods and heartbeats
@@ -495,10 +495,10 @@ func (c *Connection) dispatchN(f frame) {
 // order.
 func (c *Connection) dispatchClosed(f frame) {
 	// Only consider method frames, drop content/header frames
-	if mf, ok := f.(*methodFrame); ok {
+	if mf, ok := f.(*proto.MethodFrame); ok {
 		switch mf.Method.(type) {
 		case *proto.ChannelClose:
-			c.send(&methodFrame{
+			c.send(&proto.MethodFrame{
 				ChannelId: f.Channel(),
 				Method:    &proto.ChannelCloseOk{},
 			})
@@ -516,14 +516,14 @@ func (c *Connection) dispatchClosed(f frame) {
 // handle on channel 0 (the connection channel).
 func (c *Connection) reader(r io.Reader) {
 	buf := bufio.NewReader(r)
-	frames := &reader{buf}
+	frames := proto.NewReader(buf)
 	conn, haveDeadliner := r.(readDeadliner)
 
 	for {
 		frame, err := frames.ReadFrame()
 
 		if err != nil {
-			c.shutdown(&Error{Code: FrameError, Reason: err.Error()})
+			c.shutdown(&Error{Code: proto.FrameError, Reason: err.Error()})
 			return
 		}
 
@@ -562,7 +562,7 @@ func (c *Connection) heartbeater(interval time.Duration, done chan *Error) {
 		case at := <-sendTicks:
 			// When idle, fill the space with a heartbeat frame
 			if at.Sub(lastSent) > interval-time.Second {
-				if err := c.send(&heartbeatFrame{}); err != nil {
+				if err := c.send(&proto.HeartbeatFrame{}); err != nil {
 					// send heartbeats even after close/closeOk so we
 					// tick until the connection starts erroring
 					return
@@ -659,7 +659,7 @@ func (c *Connection) call(req message, res ...message) error {
 	// Special case for when the protocol header frame is sent insted of a
 	// request method
 	if req != nil {
-		if err := c.send(&methodFrame{ChannelId: 0, Method: req}); err != nil {
+		if err := c.send(&proto.MethodFrame{ChannelId: 0, Method: req}); err != nil {
 			return err
 		}
 	}
@@ -698,7 +698,7 @@ func (c *Connection) call(req message, res ...message) error {
 //    close-Connection    = C:CLOSE S:CLOSE-OK
 //                        / S:CLOSE C:CLOSE-OK
 func (c *Connection) open(config Config) error {
-	if err := c.send(&protocolHeader{}); err != nil {
+	if err := c.send(&proto.ProtocolHeader{}); err != nil {
 		return err
 	}
 
@@ -783,7 +783,7 @@ func (c *Connection) openTune(config Config, auth Authentication) error {
 	// Connection.Tune method"
 	go c.heartbeater(c.Config.Heartbeat, c.NotifyClose(make(chan *Error, 1)))
 
-	if err := c.send(&methodFrame{
+	if err := c.send(&proto.MethodFrame{
 		ChannelId: 0,
 		Method: &proto.ConnectionTuneOk{
 			ChannelMax: uint16(c.Config.ChannelMax),
