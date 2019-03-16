@@ -221,7 +221,7 @@ var (
     {{end}}
   {{end}}
 
-  func (r *Reader) ParseMethodFrame(channel uint16, size uint32) (f frame, err error) {
+  func (r *Reader) parseMethodFrame(channel uint16, size uint32) (f frame, err error) {
     mf := &MethodFrame {
       ChannelId: channel,
     }
@@ -243,7 +243,7 @@ var (
       case {{.Index}}: // {{$class.Name}} {{.Name}}
         //fmt.Println("NextMethod: class:{{$class.Index}} method:{{.Index}}")
         method := &{{$.StructName $class.Name .Name}}{}
-        if err = method.read(r.r); err != nil {
+        if err = method.Read(r.r); err != nil {
           return
         }
         mf.Method = method

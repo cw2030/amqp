@@ -34,7 +34,7 @@ func (f *MethodFrame) Write(w io.Writer) (err error) {
 		return errors.New("malformed frame: missing method")
 	}
 
-	class, method := f.Method.id()
+	class, method := f.Method.ID()
 
 	if err = binary.Write(&payload, binary.BigEndian, class); err != nil {
 		return
@@ -44,7 +44,7 @@ func (f *MethodFrame) Write(w io.Writer) (err error) {
 		return
 	}
 
-	if err = f.Method.write(&payload); err != nil {
+	if err = f.Method.Write(&payload); err != nil {
 		return
 	}
 

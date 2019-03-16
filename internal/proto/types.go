@@ -268,16 +268,16 @@ func (set *tagSet) Pop() interface{} {
 }
 
 type message interface {
-	id() (uint16, uint16)
-	wait() bool
-	read(io.Reader) error
-	write(io.Writer) error
+	ID() (uint16, uint16)
+	Wait() bool
+	Read(io.Reader) error
+	Write(io.Writer) error
 }
 
 type messageWithContent interface {
 	message
-	getContent() (properties, []byte)
-	setContent(properties, []byte)
+	GetContent() (properties, []byte)
+	SetContent(properties, []byte)
 }
 
 /*
