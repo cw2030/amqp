@@ -8,6 +8,8 @@ package amqp
 import (
 	"errors"
 	"time"
+
+	"github.com/streadway/amqp/internal/proto"
 )
 
 var errDeliveryNotInitialized = errors.New("delivery not initialized")
@@ -83,14 +85,14 @@ func newDelivery(channel *Channel, msg messageWithContent) *Delivery {
 
 	// Properties for the delivery types
 	switch m := msg.(type) {
-	case *basicDeliver:
+	case *proto.BasicDeliver:
 		delivery.ConsumerTag = m.ConsumerTag
 		delivery.DeliveryTag = m.DeliveryTag
 		delivery.Redelivered = m.Redelivered
 		delivery.Exchange = m.Exchange
 		delivery.RoutingKey = m.RoutingKey
 
-	case *basicGetOk:
+	case *proto.BasicGetOk:
 		delivery.MessageCount = m.MessageCount
 		delivery.DeliveryTag = m.DeliveryTag
 		delivery.Redelivered = m.Redelivered

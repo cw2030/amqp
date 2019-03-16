@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
+
+	"github.com/streadway/amqp/internal/proto"
 )
 
 // 0      1         3             7                  size+7 size+8
@@ -162,7 +164,7 @@ func (ch *Channel) send(msg message) (err error) {
 }
 
 func (ch *Channel) open() error {
-	return ch.call(&channelOpen{}, &channelOpenOk{})
+	return ch.call(&proto.ChannelOpen{}, &proto.ChannelOpenOk{})
 }
 
 // Performs a request/response call for when the message is not NoWait and is
@@ -206,7 +208,7 @@ func (ch *Channel) call(req message, res ...message) error {
 func (ch *Channel) sendClosed(msg message) (err error) {
 	// After a 'channel.close' is sent or received the only valid response is
 	// channel.close-ok
-	if _, ok := msg.(*channelCloseOk); ok {
+	if _, ok := msg.(*proto.ChannelCloseOk); ok {
 		return ch.connection.send(&methodFrame{
 			ChannelId: ch.id,
 			Method:    msg,
@@ -273,24 +275,24 @@ func (ch *Channel) sendOpen(msg message) (err error) {
 // goroutine, so assumes serialized access.
 func (ch *Channel) dispatch(msg message) {
 	switch m := msg.(type) {
-	case *channelClose:
+	case *proto.ChannelClose:
 		// lock before sending connection.close-ok
 		// to avoid unexpected interleaving with basic.publish frames if
 		// publishing is happening concurrently
 		ch.m.Lock()
-		ch.send(&channelCloseOk{})
+		ch.send(&proto.ChannelCloseOk{})
 		ch.m.Unlock()
 		ch.connection.closeChannel(ch, newError(m.ReplyCode, m.ReplyText))
 
-	case *channelFlow:
+	case *proto.ChannelFlow:
 		ch.notifyM.RLock()
 		for _, c := range ch.flows {
 			c <- m.Active
 		}
 		ch.notifyM.RUnlock()
-		ch.send(&channelFlowOk{Active: m.Active})
+		ch.send(&proto.ChannelFlowOk{Active: m.Active})
 
-	case *basicCancel:
+	case *proto.BasicCancel:
 		ch.notifyM.RLock()
 		for _, c := range ch.cancels {
 			c <- m.ConsumerTag
@@ -298,7 +300,7 @@ func (ch *Channel) dispatch(msg message) {
 		ch.notifyM.RUnlock()
 		ch.consumers.cancel(m.ConsumerTag)
 
-	case *basicReturn:
+	case *proto.BasicReturn:
 		ret := newReturn(*m)
 		ch.notifyM.RLock()
 		for _, c := range ch.returns {
@@ -306,7 +308,7 @@ func (ch *Channel) dispatch(msg message) {
 		}
 		ch.notifyM.RUnlock()
 
-	case *basicAck:
+	case *proto.BasicAck:
 		if ch.confirming {
 			if m.Multiple {
 				ch.confirms.Multiple(Confirmation{m.DeliveryTag, true})
@@ -315,7 +317,7 @@ func (ch *Channel) dispatch(msg message) {
 			}
 		}
 
-	case *basicNack:
+	case *proto.BasicNack:
 		if ch.confirming {
 			if m.Multiple {
 				ch.confirms.Multiple(Confirmation{m.DeliveryTag, false})
@@ -324,7 +326,7 @@ func (ch *Channel) dispatch(msg message) {
 			}
 		}
 
-	case *basicDeliver:
+	case *proto.BasicDeliver:
 		ch.consumers.send(m.ConsumerTag, newDelivery(ch, m))
 		// TODO log failed consumer and close channel, this can happen when
 		// deliveries are in flight and a no-wait cancel has happened
@@ -425,8 +427,8 @@ It is safe to call this method multiple times.
 func (ch *Channel) Close() error {
 	defer ch.connection.closeChannel(ch, nil)
 	return ch.call(
-		&channelClose{ReplyCode: replySuccess},
-		&channelCloseOk{},
+		&proto.ChannelClose{ReplyCode: replySuccess},
+		&proto.ChannelCloseOk{},
 	)
 }
 
@@ -643,12 +645,12 @@ http://www.rabbitmq.com/blog/2012/04/25/rabbitmq-performance-measurements-part-2
 */
 func (ch *Channel) Qos(prefetchCount, prefetchSize int, global bool) error {
 	return ch.call(
-		&basicQos{
+		&proto.BasicQos{
 			PrefetchCount: uint16(prefetchCount),
 			PrefetchSize:  uint32(prefetchSize),
 			Global:        global,
 		},
-		&basicQosOk{},
+		&proto.BasicQosOk{},
 	)
 }
 
@@ -672,11 +674,11 @@ client without an ack, and will not be redelivered to other consumers.
 
 */
 func (ch *Channel) Cancel(consumer string, noWait bool) error {
-	req := &basicCancel{
+	req := &proto.BasicCancel{
 		ConsumerTag: consumer,
 		NoWait:      noWait,
 	}
-	res := &basicCancelOk{}
+	res := &proto.BasicCancelOk{}
 
 	if err := ch.call(req, res); err != nil {
 		return err
@@ -750,7 +752,7 @@ func (ch *Channel) QueueDeclare(name string, durable, autoDelete, exclusive, noW
 		return Queue{}, err
 	}
 
-	req := &queueDeclare{
+	req := &proto.QueueDeclare{
 		Queue:      name,
 		Passive:    false,
 		Durable:    durable,
@@ -759,7 +761,7 @@ func (ch *Channel) QueueDeclare(name string, durable, autoDelete, exclusive, noW
 		NoWait:     noWait,
 		Arguments:  args,
 	}
-	res := &queueDeclareOk{}
+	res := &proto.QueueDeclareOk{}
 
 	if err := ch.call(req, res); err != nil {
 		return Queue{}, err
@@ -790,7 +792,7 @@ func (ch *Channel) QueueDeclarePassive(name string, durable, autoDelete, exclusi
 		return Queue{}, err
 	}
 
-	req := &queueDeclare{
+	req := &proto.QueueDeclare{
 		Queue:      name,
 		Passive:    true,
 		Durable:    durable,
@@ -799,7 +801,7 @@ func (ch *Channel) QueueDeclarePassive(name string, durable, autoDelete, exclusi
 		NoWait:     noWait,
 		Arguments:  args,
 	}
-	res := &queueDeclareOk{}
+	res := &proto.QueueDeclareOk{}
 
 	if err := ch.call(req, res); err != nil {
 		return Queue{}, err
@@ -832,11 +834,11 @@ channel will be closed.
 
 */
 func (ch *Channel) QueueInspect(name string) (Queue, error) {
-	req := &queueDeclare{
+	req := &proto.QueueDeclare{
 		Queue:   name,
 		Passive: true,
 	}
-	res := &queueDeclareOk{}
+	res := &proto.QueueDeclareOk{}
 
 	err := ch.call(req, res)
 
@@ -899,14 +901,14 @@ func (ch *Channel) QueueBind(name, key, exchange string, noWait bool, args Table
 	}
 
 	return ch.call(
-		&queueBind{
+		&proto.QueueBind{
 			Queue:      name,
 			Exchange:   exchange,
 			RoutingKey: key,
 			NoWait:     noWait,
 			Arguments:  args,
 		},
-		&queueBindOk{},
+		&proto.QueueBindOk{},
 	)
 }
 
@@ -924,13 +926,13 @@ func (ch *Channel) QueueUnbind(name, key, exchange string, args Table) error {
 	}
 
 	return ch.call(
-		&queueUnbind{
+		&proto.QueueUnbind{
 			Queue:      name,
 			Exchange:   exchange,
 			RoutingKey: key,
 			Arguments:  args,
 		},
-		&queueUnbindOk{},
+		&proto.QueueUnbindOk{},
 	)
 }
 
@@ -945,11 +947,11 @@ If noWait is true, do not wait for the server response and the number of
 messages purged will not be meaningful.
 */
 func (ch *Channel) QueuePurge(name string, noWait bool) (int, error) {
-	req := &queuePurge{
+	req := &proto.QueuePurge{
 		Queue:  name,
 		NoWait: noWait,
 	}
-	res := &queuePurgeOk{}
+	res := &proto.QueuePurgeOk{}
 
 	err := ch.call(req, res)
 
@@ -976,13 +978,13 @@ be closed.
 
 */
 func (ch *Channel) QueueDelete(name string, ifUnused, ifEmpty, noWait bool) (int, error) {
-	req := &queueDelete{
+	req := &proto.QueueDelete{
 		Queue:    name,
 		IfUnused: ifUnused,
 		IfEmpty:  ifEmpty,
 		NoWait:   noWait,
 	}
-	res := &queueDeleteOk{}
+	res := &proto.QueueDeleteOk{}
 
 	err := ch.call(req, res)
 
@@ -1059,7 +1061,7 @@ func (ch *Channel) Consume(queue, consumer string, autoAck, exclusive, noLocal, 
 		consumer = uniqueConsumerTag()
 	}
 
-	req := &basicConsume{
+	req := &proto.BasicConsume{
 		Queue:       queue,
 		ConsumerTag: consumer,
 		NoLocal:     noLocal,
@@ -1068,7 +1070,7 @@ func (ch *Channel) Consume(queue, consumer string, autoAck, exclusive, noLocal, 
 		NoWait:      noWait,
 		Arguments:   args,
 	}
-	res := &basicConsumeOk{}
+	res := &proto.BasicConsumeOk{}
 
 	deliveries := make(chan Delivery)
 
@@ -1140,7 +1142,7 @@ func (ch *Channel) ExchangeDeclare(name, kind string, durable, autoDelete, inter
 	}
 
 	return ch.call(
-		&exchangeDeclare{
+		&proto.ExchangeDeclare{
 			Exchange:   name,
 			Type:       kind,
 			Passive:    false,
@@ -1150,7 +1152,7 @@ func (ch *Channel) ExchangeDeclare(name, kind string, durable, autoDelete, inter
 			NoWait:     noWait,
 			Arguments:  args,
 		},
-		&exchangeDeclareOk{},
+		&proto.ExchangeDeclareOk{},
 	)
 }
 
@@ -1169,7 +1171,7 @@ func (ch *Channel) ExchangeDeclarePassive(name, kind string, durable, autoDelete
 	}
 
 	return ch.call(
-		&exchangeDeclare{
+		&proto.ExchangeDeclare{
 			Exchange:   name,
 			Type:       kind,
 			Passive:    true,
@@ -1179,7 +1181,7 @@ func (ch *Channel) ExchangeDeclarePassive(name, kind string, durable, autoDelete
 			NoWait:     noWait,
 			Arguments:  args,
 		},
-		&exchangeDeclareOk{},
+		&proto.ExchangeDeclareOk{},
 	)
 }
 
@@ -1199,12 +1201,12 @@ NotifyClose listener to respond to these channel exceptions.
 */
 func (ch *Channel) ExchangeDelete(name string, ifUnused, noWait bool) error {
 	return ch.call(
-		&exchangeDelete{
+		&proto.ExchangeDelete{
 			Exchange: name,
 			IfUnused: ifUnused,
 			NoWait:   noWait,
 		},
-		&exchangeDeleteOk{},
+		&proto.ExchangeDeleteOk{},
 	)
 }
 
@@ -1245,14 +1247,14 @@ func (ch *Channel) ExchangeBind(destination, key, source string, noWait bool, ar
 	}
 
 	return ch.call(
-		&exchangeBind{
+		&proto.ExchangeBind{
 			Destination: destination,
 			Source:      source,
 			RoutingKey:  key,
 			NoWait:      noWait,
 			Arguments:   args,
 		},
-		&exchangeBindOk{},
+		&proto.ExchangeBindOk{},
 	)
 }
 
@@ -1276,14 +1278,14 @@ func (ch *Channel) ExchangeUnbind(destination, key, source string, noWait bool, 
 	}
 
 	return ch.call(
-		&exchangeUnbind{
+		&proto.ExchangeUnbind{
 			Destination: destination,
 			Source:      source,
 			RoutingKey:  key,
 			NoWait:      noWait,
 			Arguments:   args,
 		},
-		&exchangeUnbindOk{},
+		&proto.ExchangeUnbindOk{},
 	)
 }
 
@@ -1328,7 +1330,7 @@ func (ch *Channel) Publish(exchange, key string, mandatory, immediate bool, msg 
 	ch.m.Lock()
 	defer ch.m.Unlock()
 
-	if err := ch.send(&basicPublish{
+	if err := ch.send(&proto.BasicPublish{
 		Exchange:   exchange,
 		RoutingKey: key,
 		Mandatory:  mandatory,
@@ -1379,9 +1381,9 @@ the channel or connection is closed, the message will not get requeued.
 
 */
 func (ch *Channel) Get(queue string, autoAck bool) (msg Delivery, ok bool, err error) {
-	req := &basicGet{Queue: queue, NoAck: autoAck}
-	res := &basicGetOk{}
-	empty := &basicGetEmpty{}
+	req := &proto.BasicGet{Queue: queue, NoAck: autoAck}
+	res := &proto.BasicGetOk{}
+	empty := &proto.BasicGetEmpty{}
 
 	if err := ch.call(req, res, empty); err != nil {
 		return Delivery{}, false, err
@@ -1412,8 +1414,8 @@ transaction mode.  Use a different channel for non-transactional semantics.
 */
 func (ch *Channel) Tx() error {
 	return ch.call(
-		&txSelect{},
-		&txSelectOk{},
+		&proto.TxSelect{},
+		&proto.TxSelectOk{},
 	)
 }
 
@@ -1426,8 +1428,8 @@ Calling this method without having called Channel.Tx is an error.
 */
 func (ch *Channel) TxCommit() error {
 	return ch.call(
-		&txCommit{},
-		&txCommitOk{},
+		&proto.TxCommit{},
+		&proto.TxCommitOk{},
 	)
 }
 
@@ -1440,8 +1442,8 @@ Calling this method without having called Channel.Tx is an error.
 */
 func (ch *Channel) TxRollback() error {
 	return ch.call(
-		&txRollback{},
-		&txRollbackOk{},
+		&proto.TxRollback{},
+		&proto.TxRollbackOk{},
 	)
 }
 
@@ -1470,8 +1472,8 @@ Connections for publishings and deliveries.
 */
 func (ch *Channel) Flow(active bool) error {
 	return ch.call(
-		&channelFlow{Active: active},
-		&channelFlowOk{},
+		&proto.ChannelFlow{Active: active},
+		&proto.ChannelFlowOk{},
 	)
 }
 
@@ -1502,8 +1504,8 @@ exception could occur if the server does not support this method.
 */
 func (ch *Channel) Confirm(noWait bool) error {
 	if err := ch.call(
-		&confirmSelect{Nowait: noWait},
-		&confirmSelectOk{},
+		&proto.ConfirmSelect{Nowait: noWait},
+		&proto.ConfirmSelectOk{},
 	); err != nil {
 		return err
 	}
@@ -1530,8 +1532,8 @@ Note: this method is not implemented on RabbitMQ, use Delivery.Nack instead
 */
 func (ch *Channel) Recover(requeue bool) error {
 	return ch.call(
-		&basicRecover{Requeue: requeue},
-		&basicRecoverOk{},
+		&proto.BasicRecover{Requeue: requeue},
+		&proto.BasicRecoverOk{},
 	)
 }
 
@@ -1548,7 +1550,7 @@ func (ch *Channel) Ack(tag uint64, multiple bool) error {
 	ch.m.Lock()
 	defer ch.m.Unlock()
 
-	return ch.send(&basicAck{
+	return ch.send(&proto.BasicAck{
 		DeliveryTag: tag,
 		Multiple:    multiple,
 	})
@@ -1565,7 +1567,7 @@ func (ch *Channel) Nack(tag uint64, multiple bool, requeue bool) error {
 	ch.m.Lock()
 	defer ch.m.Unlock()
 
-	return ch.send(&basicNack{
+	return ch.send(&proto.BasicNack{
 		DeliveryTag: tag,
 		Multiple:    multiple,
 		Requeue:     requeue,
@@ -1583,7 +1585,7 @@ func (ch *Channel) Reject(tag uint64, requeue bool) error {
 	ch.m.Lock()
 	defer ch.m.Unlock()
 
-	return ch.send(&basicReject{
+	return ch.send(&proto.BasicReject{
 		DeliveryTag: tag,
 		Requeue:     requeue,
 	})
