@@ -66,8 +66,8 @@ func (t *server) send(channel int, m message) {
 	defer time.AfterFunc(time.Second, func() { panic("send deadlock") }).Stop()
 
 	if msg, ok := m.(messageWithContent); ok {
-		props, body := msg.getContent()
-		class, _ := msg.id()
+		props, body := msg.GetContent()
+		class, _ := msg.ID()
 		t.w.WriteFrame(&methodFrame{
 			ChannelId: uint16(channel),
 			Method:    msg,
@@ -104,8 +104,8 @@ func (t *server) recv(channel int, m message) message {
 			t.Fatalf("frame err, read: %s", err)
 		}
 
-		if frame.channel() != uint16(channel) {
-			t.Fatalf("expected frame on channel %d, got channel %d", channel, frame.channel())
+		if frame.Channel() != uint16(channel) {
+			t.Fatalf("expected frame on channel %d, got channel %d", channel, frame.Channel())
 		}
 
 		switch f := frame.(type) {
@@ -117,7 +117,7 @@ func (t *server) recv(channel int, m message) message {
 			header = f
 			remaining = int(header.Size)
 			if remaining == 0 {
-				m.(messageWithContent).setContent(header.Properties, nil)
+				m.(messageWithContent).SetContent(header.Properties, nil)
 				return m
 			}
 
@@ -126,7 +126,7 @@ func (t *server) recv(channel int, m message) message {
 			body = append(body, f.Body...)
 			remaining -= len(f.Body)
 			if remaining <= 0 {
-				m.(messageWithContent).setContent(header.Properties, body)
+				m.(messageWithContent).SetContent(header.Properties, body)
 				return m
 			}
 

@@ -59,7 +59,7 @@ type Delivery struct {
 }
 
 func newDelivery(channel *Channel, msg messageWithContent) *Delivery {
-	props, body := msg.getContent()
+	props, body := msg.GetContent()
 
 	delivery := Delivery{
 		Acknowledger: channel,

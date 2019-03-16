@@ -172,7 +172,7 @@ func (ch *Channel) call(req message, res ...message) error {
 		return err
 	}
 
-	if req.wait() {
+	if req.Wait() {
 		select {
 		case e, ok := <-ch.errors:
 			if ok {
@@ -218,8 +218,8 @@ func (ch *Channel) sendClosed(msg message) (err error) {
 
 func (ch *Channel) sendOpen(msg message) (err error) {
 	if content, ok := msg.(messageWithContent); ok {
-		props, body := content.getContent()
-		class, _ := content.id()
+		props, body := content.GetContent()
+		class, _ := content.ID()
 
 		// catch client max frame size==0 and server max frame size==0
 		// set size to length of what we're trying to publish
@@ -374,7 +374,7 @@ func (ch *Channel) recvHeader(f frame) error {
 		ch.header = frame
 
 		if frame.Size == 0 {
-			ch.message.setContent(ch.header.Properties, ch.body)
+			ch.message.SetContent(ch.header.Properties, ch.body)
 			ch.dispatch(ch.message) // termination state
 			return ch.transition((*Channel).recvMethod)
 		}
@@ -404,7 +404,7 @@ func (ch *Channel) recvContent(f frame) error {
 		ch.body = append(ch.body, frame.Body...)
 
 		if uint64(len(ch.body)) >= ch.header.Size {
-			ch.message.setContent(ch.header.Properties, ch.body)
+			ch.message.SetContent(ch.header.Properties, ch.body)
 			ch.dispatch(ch.message) // termination state
 			return ch.transition((*Channel).recvMethod)
 		}
@@ -682,7 +682,7 @@ func (ch *Channel) Cancel(consumer string, noWait bool) error {
 		return err
 	}
 
-	if req.wait() {
+	if req.Wait() {
 		ch.consumers.cancel(res.ConsumerTag)
 	} else {
 		// Potentially could drop deliveries in flight
@@ -765,7 +765,7 @@ func (ch *Channel) QueueDeclare(name string, durable, autoDelete, exclusive, noW
 		return Queue{}, err
 	}
 
-	if req.wait() {
+	if req.Wait() {
 		return Queue{
 			Name:      res.Queue,
 			Messages:  int(res.MessageCount),
@@ -805,7 +805,7 @@ func (ch *Channel) QueueDeclarePassive(name string, durable, autoDelete, exclusi
 		return Queue{}, err
 	}
 
-	if req.wait() {
+	if req.Wait() {
 		return Queue{
 			Name:      res.Queue,
 			Messages:  int(res.MessageCount),

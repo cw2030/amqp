@@ -268,16 +268,16 @@ func (set *tagSet) Pop() interface{} {
 }
 
 type message interface {
-	id() (uint16, uint16)
-	wait() bool
-	read(io.Reader) error
-	write(io.Writer) error
+	ID() (uint16, uint16)
+	Wait() bool
+	Read(io.Reader) error
+	Write(io.Writer) error
 }
 
 type messageWithContent interface {
 	message
-	getContent() (properties, []byte)
-	setContent(properties, []byte)
+	GetContent() (properties, []byte)
+	SetContent(properties, []byte)
 }
 
 /*
@@ -306,8 +306,8 @@ system calls to read a frame.
 
 */
 type frame interface {
-	write(io.Writer) error
-	channel() uint16
+	Write(io.Writer) error
+	Channel() uint16
 }
 
 type reader struct {
@@ -321,12 +321,12 @@ type writer struct {
 // Implements the frame interface for Connection RPC
 type protocolHeader struct{}
 
-func (protocolHeader) write(w io.Writer) error {
+func (protocolHeader) Write(w io.Writer) error {
 	_, err := w.Write([]byte{'A', 'M', 'Q', 'P', 0, 0, 9, 1})
 	return err
 }
 
-func (protocolHeader) channel() uint16 {
+func (protocolHeader) Channel() uint16 {
 	panic("only valid as initial handshake")
 }
 
@@ -359,7 +359,7 @@ type methodFrame struct {
 	Method    message
 }
 
-func (f *methodFrame) channel() uint16 { return f.ChannelId }
+func (f *methodFrame) Channel() uint16 { return f.ChannelId }
 
 /*
 Heartbeating is a technique designed to undo one of TCP/IP's features, namely
@@ -374,7 +374,7 @@ type heartbeatFrame struct {
 	ChannelId uint16
 }
 
-func (f *heartbeatFrame) channel() uint16 { return f.ChannelId }
+func (f *heartbeatFrame) Channel() uint16 { return f.ChannelId }
 
 /*
 Certain methods (such as Basic.Publish, Basic.Deliver, etc.) are formally
@@ -403,7 +403,7 @@ type headerFrame struct {
 	Properties properties
 }
 
-func (f *headerFrame) channel() uint16 { return f.ChannelId }
+func (f *headerFrame) Channel() uint16 { return f.ChannelId }
 
 /*
 Content is the application data we carry from client-to-client via the AMQP
@@ -425,4 +425,4 @@ type bodyFrame struct {
 	Body      []byte
 }
 
-func (f *bodyFrame) channel() uint16 { return f.ChannelId }
+func (f *bodyFrame) Channel() uint16 { return f.ChannelId }

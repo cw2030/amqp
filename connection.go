@@ -430,7 +430,7 @@ func (c *Connection) shutdown(err *Error) {
 // All methods sent to the connection channel should be synchronous so we
 // can handle them directly without a framing component
 func (c *Connection) demux(f frame) {
-	if f.channel() == 0 {
+	if f.Channel() == 0 {
 		c.dispatch0(f)
 	} else {
 		c.dispatchN(f)
@@ -470,7 +470,7 @@ func (c *Connection) dispatch0(f frame) {
 
 func (c *Connection) dispatchN(f frame) {
 	c.m.Lock()
-	channel := c.channels[f.channel()]
+	channel := c.channels[f.Channel()]
 	c.m.Unlock()
 
 	if channel != nil {
@@ -497,7 +497,7 @@ func (c *Connection) dispatchClosed(f frame) {
 		switch mf.Method.(type) {
 		case *channelClose:
 			c.send(&methodFrame{
-				ChannelId: f.channel(),
+				ChannelId: f.Channel(),
 				Method:    &channelCloseOk{},
 			})
 		case *channelCloseOk:
