@@ -13,13 +13,14 @@ import (
 	"time"
 )
 
+// NewReader returns an AMQP 0.9 frame reader
 func NewReader(r io.Reader) *Reader {
 	return &Reader{r: r}
 }
 
 /*
-Reads a frame from an input stream and returns an interface that can be cast into
-one of the following:
+ReadFrame reads a frame from an input stream and returns an interface that can
+be cast into one of the following:
 
    methodFrame
    PropertiesFrame
@@ -47,7 +48,7 @@ In realistic implementations where performance is a concern, we would use
 
 “gathering reads” to avoid doing three separate system calls to read a frame.
 */
-func (r *Reader) ReadFrame() (frame frame, err error) {
+func (r *Reader) ReadFrame() (frame Frame, err error) {
 	var scratch [7]byte
 
 	if _, err = io.ReadFull(r.r, scratch[:7]); err != nil {
@@ -335,7 +336,7 @@ func hasProperty(mask uint16, prop int) bool {
 	return int(mask)&prop > 0
 }
 
-func (r *Reader) parseHeaderFrame(channel uint16, size uint32) (frame frame, err error) {
+func (r *Reader) parseHeaderFrame(channel uint16, size uint32) (frame Frame, err error) {
 	hf := &HeaderFrame{
 		ChannelId: channel,
 	}
@@ -432,7 +433,7 @@ func (r *Reader) parseHeaderFrame(channel uint16, size uint32) (frame frame, err
 	return hf, nil
 }
 
-func (r *Reader) parseBodyFrame(channel uint16, size uint32) (frame frame, err error) {
+func (r *Reader) parseBodyFrame(channel uint16, size uint32) (frame Frame, err error) {
 	bf := &BodyFrame{
 		ChannelId: channel,
 		Body:      make([]byte, size),
@@ -447,7 +448,7 @@ func (r *Reader) parseBodyFrame(channel uint16, size uint32) (frame frame, err e
 
 var errHeartbeatPayload = errors.New("Heartbeats should not have a payload")
 
-func (r *Reader) parseHeartbeatFrame(channel uint16, size uint32) (frame frame, err error) {
+func (r *Reader) parseHeartbeatFrame(channel uint16, size uint32) (frame Frame, err error) {
 	hf := &HeartbeatFrame{
 		ChannelId: channel,
 	}

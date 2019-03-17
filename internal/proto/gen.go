@@ -168,6 +168,7 @@ var (
 	{{.Name | public}} = {{.Value}}{{end}}
   )
 
+	// IsSoftExceptionCode returns true if the exception code can be recovered
 	func IsSoftExceptionCode(code int) bool {
 		switch code {
 		{{range $c := .Constants}} {{if $c.IsSoftError}} case {{$c.Value}}:
@@ -182,7 +183,7 @@ var (
     {{range .Methods}}
       {{$method := .}}
 			{{$struct := $.StructName $class.Name $method.Name}}
-      {{if .Docs}}/* {{range .Docs}} {{.Body | clean}} {{end}} */{{end}}
+      // {{ $struct }} represents the AMQP message {{$class.Name}}.{{$method.Name}}
       type {{$struct}} struct {
         {{range .Fields}}
         {{$.FieldName .}} {{$.FieldType . | $.NativeType}} {{if .Label}}// {{.Label}}{{end}}{{end}}
@@ -190,29 +191,35 @@ var (
 				Body []byte{{end}}
       }
 
+			// ID returns the AMQP class and method identifiers for this message
 			func (msg *{{$struct}}) ID() (uint16, uint16) {
 				return {{$class.Index}}, {{$method.Index}}
 			}
 
+			// Wait returns true when the client should expect a response from the server
 			func (msg *{{$struct}}) Wait() (bool) {
 				return {{.Synchronous}}{{if $.HasField "NoWait" .}} && !msg.NoWait{{end}}
 			}
 
 			{{if .Content}}
+			// GetContent returns the Properties and Body from this message
       func (msg *{{$struct}}) GetContent() (Properties, []byte) {
         return msg.Properties, msg.Body
       }
 
+			// SetContent sets the Properties and Body for serialization
       func (msg *{{$struct}}) SetContent(props Properties, body []byte) {
         msg.Properties, msg.Body = props, body
       }
 			{{end}}
+      // Write serializes this message to the provided writer
       func (msg *{{$struct}}) Write(w io.Writer) (err error) {
 				{{if $.HasType "bit" $method}}var bits byte{{end}}
         {{.Fields | $.Fieldsets | $.Partial "enc-"}}
         return
       }
 
+      // Read deserializes this message from the provided reader
       func (msg *{{$struct}}) Read(r io.Reader) (err error) {
 				{{if $.HasType "bit" $method}}var bits byte{{end}}
         {{.Fields | $.Fieldsets | $.Partial "dec-"}}

@@ -13,25 +13,26 @@ import (
 	"github.com/streadway/amqp/internal/proto"
 )
 
+// Protocol error exception codes
 const (
-	ContentTooLarge    = 311
-	NoRoute            = 312
-	NoConsumers        = 313
-	ConnectionForced   = 320
-	InvalidPath        = 402
-	AccessRefused      = 403
-	NotFound           = 404
-	ResourceLocked     = 405
-	PreconditionFailed = 406
-	FrameError         = 501
-	SyntaxError        = 502
-	CommandInvalid     = 503
-	ChannelError       = 504
-	UnexpectedFrame    = 505
-	ResourceError      = 506
-	NotAllowed         = 530
-	NotImplemented     = 540
-	InternalError      = 541
+	ContentTooLarge    = proto.ContentTooLarge
+	NoRoute            = proto.NoRoute
+	NoConsumers        = proto.NoConsumers
+	ConnectionForced   = proto.ConnectionForced
+	InvalidPath        = proto.InvalidPath
+	AccessRefused      = proto.AccessRefused
+	NotFound           = proto.NotFound
+	ResourceLocked     = proto.ResourceLocked
+	PreconditionFailed = proto.PreconditionFailed
+	FrameError         = proto.FrameError
+	SyntaxError        = proto.SyntaxError
+	CommandInvalid     = proto.CommandInvalid
+	ChannelError       = proto.ChannelError
+	UnexpectedFrame    = proto.UnexpectedFrame
+	ResourceError      = proto.ResourceError
+	NotAllowed         = proto.NotAllowed
+	NotImplemented     = proto.NotImplemented
+	InternalError      = proto.InternalError
 )
 
 // Constants for standard AMQP 0-9-1 exchange types.
@@ -44,44 +45,44 @@ const (
 
 var (
 	// ErrClosed is returned when the channel or connection is not open
-	ErrClosed = &Error{Code: proto.ChannelError, Reason: "channel/connection is not open"}
+	ErrClosed = &Error{Code: ChannelError, Reason: "channel/connection is not open"}
 
 	// ErrChannelMax is returned when Connection.Channel has been called enough
 	// times that all channel IDs have been exhausted in the client or the
 	// server.
-	ErrChannelMax = &Error{Code: proto.ChannelError, Reason: "channel id space exhausted"}
+	ErrChannelMax = &Error{Code: ChannelError, Reason: "channel id space exhausted"}
 
 	// ErrSASL is returned from Dial when the authentication mechanism could not
 	// be negoated.
-	ErrSASL = &Error{Code: proto.AccessRefused, Reason: "SASL could not negotiate a shared mechanism"}
+	ErrSASL = &Error{Code: AccessRefused, Reason: "SASL could not negotiate a shared mechanism"}
 
 	// ErrCredentials is returned when the authenticated client is not authorized
 	// to any vhost.
-	ErrCredentials = &Error{Code: proto.AccessRefused, Reason: "username or password not allowed"}
+	ErrCredentials = &Error{Code: AccessRefused, Reason: "username or password not allowed"}
 
 	// ErrVhost is returned when the authenticated user is not permitted to
 	// access the requested Vhost.
-	ErrVhost = &Error{Code: proto.AccessRefused, Reason: "no access to this vhost"}
+	ErrVhost = &Error{Code: AccessRefused, Reason: "no access to this vhost"}
 
 	// ErrSyntax is hard protocol error, indicating an unsupported protocol,
 	// implementation or encoding.
-	ErrSyntax = &Error{Code: proto.SyntaxError, Reason: "invalid field or value inside of a frame"}
+	ErrSyntax = &Error{Code: SyntaxError, Reason: "invalid field or value inside of a frame"}
 
 	// ErrFrame is returned when the protocol frame cannot be read from the
 	// server, indicating an unsupported protocol or unsupported frame type.
-	ErrFrame = &Error{Code: proto.FrameError, Reason: "frame could not be parsed"}
+	ErrFrame = &Error{Code: FrameError, Reason: "frame could not be parsed"}
 
 	// ErrCommandInvalid is returned when the server sends an unexpected response
 	// to this requested message type. This indicates a bug in this client.
-	ErrCommandInvalid = &Error{Code: proto.CommandInvalid, Reason: "unexpected command received"}
+	ErrCommandInvalid = &Error{Code: CommandInvalid, Reason: "unexpected command received"}
 
 	// ErrUnexpectedFrame is returned when something other than a method or
 	// heartbeat frame is delivered to the Connection, indicating a bug in the
 	// client.
-	ErrUnexpectedFrame = &Error{Code: proto.UnexpectedFrame, Reason: "unexpected frame received"}
+	ErrUnexpectedFrame = &Error{Code: UnexpectedFrame, Reason: "unexpected frame received"}
 
 	// ErrFieldType is returned when writing a message containing a Go type unsupported by AMQP.
-	ErrFieldType = &Error{Code: proto.SyntaxError, Reason: "unsupported table field type"}
+	ErrFieldType = &Error{Code: SyntaxError, Reason: "unsupported table field type"}
 )
 
 // Error captures the code and reason a channel or connection has been closed

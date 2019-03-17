@@ -15,11 +15,13 @@ import (
 	"time"
 )
 
+// NewWriter returns an AMQP 0.9 frame encoder
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{w: w}
 }
 
-func (w *Writer) WriteFrame(frame frame) (err error) {
+// WriteFrame encodes a frame to the writer
+func (w *Writer) WriteFrame(frame Frame) (err error) {
 	if err = frame.Write(w.w); err != nil {
 		return
 	}
@@ -31,6 +33,7 @@ func (w *Writer) WriteFrame(frame frame) (err error) {
 	return
 }
 
+// Write implements Frame
 func (f *MethodFrame) Write(w io.Writer) (err error) {
 	var payload bytes.Buffer
 
@@ -55,13 +58,15 @@ func (f *MethodFrame) Write(w io.Writer) (err error) {
 	return writeFrame(w, FrameMethod, f.ChannelId, payload.Bytes())
 }
 
-// Heartbeat
+// Write implements Frame
 //
 // Payload is empty
 func (f *HeartbeatFrame) Write(w io.Writer) (err error) {
 	return writeFrame(w, FrameHeartbeat, f.ChannelId, []byte{})
 }
 
+// Write implements Frame
+//
 // CONTENT HEADER
 // 0          2        4           12               14
 // +----------+--------+-----------+----------------+------------- - -
@@ -203,7 +208,7 @@ func (f *HeaderFrame) Write(w io.Writer) (err error) {
 	return writeFrame(w, FrameHeader, f.ChannelId, payload.Bytes())
 }
 
-// Body
+// Write implements Frame
 //
 // Payload is one byterange from the full body who's size is declared in the
 // Header frame

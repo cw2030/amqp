@@ -83,7 +83,8 @@ func (e Error) Error() string {
 	return fmt.Sprintf("Exception (%d) Reason: %q", e.Code, e.Reason)
 }
 
-// Used by header frames to capture routing and header information
+// Properties is used by header frames to capture routing and header
+// information
 type Properties struct {
 	ContentType     string    // MIME content type
 	ContentEncoding string    // MIME content encoding
@@ -281,57 +282,61 @@ type messageWithContent interface {
 }
 
 /*
-The base interface implemented as:
+Frame is the base interface implemented as:
 
-2.3.5  frame Details
+2.3.5  Frame Details
 
-All frames consist of a header (7 octets), a payload of arbitrary size, and a 'frame-end' octet that detects
+All frames consist of a header (7 octets), a payload of arbitrary size, and a 'Frame-end' octet that detects
 malformed frames:
 
   0      1         3             7                  size+7 size+8
   +------+---------+-------------+  +------------+  +-----------+
-  | type | channel |     size    |  |  payload   |  | frame-end |
+  | type | channel |     size    |  |  payload   |  | Frame-end |
   +------+---------+-------------+  +------------+  +-----------+
    octet   short         long         size octets       octet
 
-To read a frame, we:
+To read a Frame, we:
 
- 1. Read the header and check the frame type and channel.
- 2. Depending on the frame type, we read the payload and process it.
- 3. Read the frame end octet.
+ 1. Read the header and check the Frame type and channel.
+ 2. Depending on the Frame type, we read the payload and process it.
+ 3. Read the Frame end octet.
 
 In realistic implementations where performance is a concern, we would use
 “read-ahead buffering” or “gathering reads” to avoid doing three separate
-system calls to read a frame.
+system calls to read a Frame.
 
 */
-type frame interface {
+type Frame interface {
 	Write(io.Writer) error
 	Channel() uint16
 }
 
+// Reader is a AMQP 0.9 frame decoder
 type Reader struct {
 	r io.Reader
 }
 
+// Writer is a AMQP 0.9 frame encoder
 type Writer struct {
 	w io.Writer
 }
 
-// Implements the frame interface for Connection RPC
+// ProtocolHeader is the initial protocol handshake frame
 type ProtocolHeader struct{}
 
+// Write implements frame
 func (ProtocolHeader) Write(w io.Writer) error {
 	_, err := w.Write([]byte{'A', 'M', 'Q', 'P', 0, 0, 9, 1})
 	return err
 }
 
+// Channel implements frame
 func (ProtocolHeader) Channel() uint16 {
 	panic("only valid as initial handshake")
 }
 
 /*
-Method frames carry the high-level protocol commands (which we call "methods").
+MethodFrame carries the high-level protocol commands (which we call "methods").
 One method frame carries one command.  The method frame payload has this format:
 
   0          2           4
@@ -359,10 +364,11 @@ type MethodFrame struct {
 	Method    message
 }
 
+// Channel implements frame
 func (f *MethodFrame) Channel() uint16 { return f.ChannelId }
 
 /*
-Heartbeating is a technique designed to undo one of TCP/IP's features, namely
+HeartbeatFrame is a technique designed to undo one of TCP/IP's features, namely
 its ability to recover from a broken physical connection by closing only after
 a quite long time-out.  In some scenarios we need to know very rapidly if a
 peer is disconnected or not responding for other reasons (e.g. it is looping).
@@ -374,9 +380,12 @@ type HeartbeatFrame struct {
 	ChannelId uint16
 }
 
+// Channel implements frame
 func (f *HeartbeatFrame) Channel() uint16 { return f.ChannelId }
 
 /*
+HeaderFrame is the initial method for multipart content frames.
+
 Certain methods (such as Basic.Publish, Basic.Deliver, etc.) are formally
 defined as carrying content.  When a peer sends such a method frame, it always
 follows it with a content header and zero or more content body frames.
@@ -403,10 +412,11 @@ type HeaderFrame struct {
 	Properties Properties
 }
 
+// Channel implements frame
 func (f *HeaderFrame) Channel() uint16 { return f.ChannelId }
 
 /*
-Content is the application data we carry from client-to-client via the AMQP
+BodyFrame is the application data we carry from client-to-client via the AMQP
 server.  Content is, roughly speaking, a set of properties plus a binary data
 part.  The set of allowed properties are defined by the Basic class, and these
 form the "content header frame".  The data can be any size, and MAY be broken
@@ -425,4 +435,5 @@ type BodyFrame struct {
 	Body      []byte
 }
 
+// Channel implements frame
 func (f *BodyFrame) Channel() uint16 { return f.ChannelId }
