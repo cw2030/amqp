@@ -64,14 +64,6 @@ var (
 	// access the requested Vhost.
 	ErrVhost = &Error{Code: AccessRefused, Reason: "no access to this vhost"}
 
-	// ErrSyntax is hard protocol error, indicating an unsupported protocol,
-	// implementation or encoding.
-	ErrSyntax = &Error{Code: SyntaxError, Reason: "invalid field or value inside of a frame"}
-
-	// ErrFrame is returned when the protocol frame cannot be read from the
-	// server, indicating an unsupported protocol or unsupported frame type.
-	ErrFrame = &Error{Code: FrameError, Reason: "frame could not be parsed"}
-
 	// ErrCommandInvalid is returned when the server sends an unexpected response
 	// to this requested message type. This indicates a bug in this client.
 	ErrCommandInvalid = &Error{Code: CommandInvalid, Reason: "unexpected command received"}
@@ -81,8 +73,16 @@ var (
 	// client.
 	ErrUnexpectedFrame = &Error{Code: UnexpectedFrame, Reason: "unexpected frame received"}
 
+	// ErrSyntax is hard protocol error, indicating an unsupported protocol,
+	// implementation or encoding.
+	ErrSyntax = proto.ErrSyntax
+
+	// ErrFrame is returned when the protocol frame cannot be read from the
+	// server, indicating an unsupported protocol or unsupported frame type.
+	ErrFrame = proto.ErrFrame
+
 	// ErrFieldType is returned when writing a message containing a Go type unsupported by AMQP.
-	ErrFieldType = &Error{Code: SyntaxError, Reason: "unsupported table field type"}
+	ErrFieldType = proto.ErrFieldType
 )
 
 // Error captures the code and reason a channel or connection has been closed

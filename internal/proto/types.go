@@ -11,35 +11,7 @@ import (
 	"time"
 )
 
-// Constants for standard AMQP 0-9-1 exchange types.
-const (
-	ExchangeDirect  = "direct"
-	ExchangeFanout  = "fanout"
-	ExchangeTopic   = "topic"
-	ExchangeHeaders = "headers"
-)
-
 var (
-	// ErrClosed is returned when the channel or connection is not open
-	ErrClosed = &Error{Code: ChannelError, Reason: "channel/connection is not open"}
-
-	// ErrChannelMax is returned when Connection.Channel has been called enough
-	// times that all channel IDs have been exhausted in the client or the
-	// server.
-	ErrChannelMax = &Error{Code: ChannelError, Reason: "channel id space exhausted"}
-
-	// ErrSASL is returned from Dial when the authentication mechanism could not
-	// be negoated.
-	ErrSASL = &Error{Code: AccessRefused, Reason: "SASL could not negotiate a shared mechanism"}
-
-	// ErrCredentials is returned when the authenticated client is not authorized
-	// to any vhost.
-	ErrCredentials = &Error{Code: AccessRefused, Reason: "username or password not allowed"}
-
-	// ErrVhost is returned when the authenticated user is not permitted to
-	// access the requested Vhost.
-	ErrVhost = &Error{Code: AccessRefused, Reason: "no access to this vhost"}
-
 	// ErrSyntax is hard protocol error, indicating an unsupported protocol,
 	// implementation or encoding.
 	ErrSyntax = &Error{Code: SyntaxError, Reason: "invalid field or value inside of a frame"}
@@ -47,15 +19,6 @@ var (
 	// ErrFrame is returned when the protocol frame cannot be read from the
 	// server, indicating an unsupported protocol or unsupported frame type.
 	ErrFrame = &Error{Code: FrameError, Reason: "frame could not be parsed"}
-
-	// ErrCommandInvalid is returned when the server sends an unexpected response
-	// to this requested message type. This indicates a bug in this client.
-	ErrCommandInvalid = &Error{Code: CommandInvalid, Reason: "unexpected command received"}
-
-	// ErrUnexpectedFrame is returned when something other than a method or
-	// heartbeat frame is delivered to the Connection, indicating a bug in the
-	// client.
-	ErrUnexpectedFrame = &Error{Code: UnexpectedFrame, Reason: "unexpected frame received"}
 
 	// ErrFieldType is returned when writing a message containing a Go type unsupported by AMQP.
 	ErrFieldType = &Error{Code: SyntaxError, Reason: "unsupported table field type"}
@@ -102,20 +65,6 @@ type Properties struct {
 	reserved1       string    // was cluster-id - process for buffer consumption
 }
 
-// DeliveryMode.  Transient means higher throughput but messages will not be
-// restored on broker restart.  The delivery mode of publishings is unrelated
-// to the durability of the queues they reside on.  Transient messages will
-// not be restored to durable queues, persistent messages will be restored to
-// durable queues and lost on non-durable queues during server restart.
-//
-// This remains typed as uint8 to match Publishing.DeliveryMode.  Other
-// delivery modes specific to custom queue implementations are not enumerated
-// here.
-const (
-	Transient  uint8 = 1
-	Persistent uint8 = 2
-)
-
 // The property flags are an array of bits that indicate the presence or
 // absence of each property value in sequence.  The bits are ordered from most
 // high to low - bit 15 indicates the first property.
@@ -135,58 +84,6 @@ const (
 	flagAppId           = 0x0008
 	flagReserved1       = 0x0004
 )
-
-// Queue captures the current server state of the queue on the server returned
-// from Channel.QueueDeclare or Channel.QueueInspect.
-type Queue struct {
-	Name      string // server confirmed or generated name
-	Messages  int    // count of messages not awaiting acknowledgment
-	Consumers int    // number of consumers receiving deliveries
-}
-
-// Publishing captures the client message sent to the server.  The fields
-// outside of the Headers table included in this struct mirror the underlying
-// fields in the content frame.  They use native types for convenience and
-// efficiency.
-type Publishing struct {
-	// Application or exchange specific fields,
-	// the headers exchange will inspect this field.
-	Headers Table
-
-	// Properties
-	ContentType     string    // MIME content type
-	ContentEncoding string    // MIME content encoding
-	DeliveryMode    uint8     // Transient (0 or 1) or Persistent (2)
-	Priority        uint8     // 0 to 9
-	CorrelationId   string    // correlation identifier
-	ReplyTo         string    // address to to reply to (ex: RPC)
-	Expiration      string    // message expiration spec
-	MessageId       string    // message identifier
-	Timestamp       time.Time // message timestamp
-	Type            string    // message type name
-	UserId          string    // creating user id - ex: "guest"
-	AppId           string    // creating application id
-
-	// The application specific payload of the message
-	Body []byte
-}
-
-// Blocking notifies the server's TCP flow control of the Connection.  When a
-// server hits a memory or disk alarm it will block all connections until the
-// resources are reclaimed.  Use NotifyBlock on the Connection to receive these
-// events.
-type Blocking struct {
-	Active bool   // TCP pushback active/inactive on server
-	Reason string // Server reason for activation
-}
-
-// Confirmation notifies the acknowledgment or negative acknowledgement of a
-// publishing identified by its delivery tag.  Use NotifyPublish on the Channel
-// to consume these events.
-type Confirmation struct {
-	DeliveryTag uint64 // A 1 based counter of publishings from when the channel was put in Confirm mode
-	Ack         bool   // True when the server successfully received the publishing
-}
 
 // Decimal matches the AMQP decimal type.  Scale is the number of decimal
 // digits Scale == 2, Value == 12345, Decimal == 123.45
@@ -253,19 +150,6 @@ func validateField(f interface{}) error {
 // Validate returns and error if any Go types in the table are incompatible with AMQP types.
 func (t Table) Validate() error {
 	return validateField(t)
-}
-
-// Heap interface for maintaining delivery tags
-type tagSet []uint64
-
-func (set tagSet) Len() int              { return len(set) }
-func (set tagSet) Less(i, j int) bool    { return (set)[i] < (set)[j] }
-func (set tagSet) Swap(i, j int)         { (set)[i], (set)[j] = (set)[j], (set)[i] }
-func (set *tagSet) Push(tag interface{}) { *set = append(*set, tag.(uint64)) }
-func (set *tagSet) Pop() interface{} {
-	val := (*set)[len(*set)-1]
-	*set = (*set)[:len(*set)-1]
-	return val
 }
 
 type message interface {
